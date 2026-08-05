@@ -1,27 +1,26 @@
 /**
  * HZPay SHA512 signature helpers
  *
- * Rules (from HZPay docs):
- * 1. Remove `sign`
- * 2. Ignore empty / null / undefined fields — BUT keep numeric 0
- * 3. Sort keys alphabetically (ASCII / A-Z)
- * 4. Join as key=value&key=value
- * 5. Append &key=MERCHANT_SECRET
- * 6. SHA512 → UPPERCASE hex
- *
- * Webhook note: amount SHOULD be signed with exactly 2 decimal places (e.g. 100.00)
+ * Official rules:
+ * 1. Take all non-empty parameters in set M
+ * 2. Sort by parameter name ASCII (lexicographical / dictionary order)
+ * 3. Join as key1=value1&key2=value2…
+ * 4. Append &key=MERCHANT_SECRET → stringSignTemp
+ * 5. SHA512(stringSignTemp) → sign (lowercase hex — live API verified)
+ * - Values are stringified exactly as sent (no forced amount decimals on create)
  */
 
 const crypto = require('crypto');
 
 const isEmptyValue = (value) => {
   if (value === null || value === undefined) return true;
-  if (typeof value === 'string' && value.trim() === '') return true;
+  if (typeof value === 'string' && value === '') return true;
   return false;
 };
 
 /**
- * Normalize amount for signature (2 decimal places).
+ * Normalize amount for display / optional webhook verify.
+ * Does NOT alter create-order signing by default.
  * @param {any} amount
  * @returns {string}
  */
@@ -31,14 +30,28 @@ const formatAmountTwoDecimals = (amount) => {
   return n.toFixed(2);
 };
 
+/**
+ * Amount as signed/sent value — match gateway JSON number style.
+ * 100 → "100", 100.5 → "100.5", 100.50 → "100.5"
+ * @param {any} amount
+ * @returns {string}
+ */
+const formatAmountForGateway = (amount) => {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return String(amount);
+  return String(n);
+};
+
 const AMOUNT_KEYS = new Set(['amount', 'orderAmount']);
 
 /**
  * Build canonical sign string (without hash).
+ * Formula: param1=value1&param2=value2&…&key=商户密钥
+ *
  * @param {Object} params
  * @param {string} secret
  * @param {Object} [options]
- * @param {boolean} [options.forceAmountDecimals] - force amount fields to 2 decimals
+ * @param {boolean} [options.forceAmountDecimals]
  * @returns {string}
  */
 const buildSignPayload = (params = {}, secret, options = {}) => {
@@ -48,49 +61,48 @@ const buildSignPayload = (params = {}, secret, options = {}) => {
 
   const filtered = {};
   Object.keys(params).forEach((key) => {
+    // sign does not participate; names are case-sensitive (do not rewrite keys)
     if (key === 'sign') return;
+
     let value = params[key];
     if (isEmptyValue(value)) return;
 
-    if (
-      options.forceAmountDecimals &&
-      AMOUNT_KEYS.has(key) &&
-      value !== undefined &&
-      value !== null &&
-      value !== ''
-    ) {
+    if (options.forceAmountDecimals && AMOUNT_KEYS.has(key)) {
       value = formatAmountTwoDecimals(value);
     }
 
-    filtered[key] = value;
+    // URL key-value pair uses the literal string form of the value
+    filtered[key] = String(value);
   });
 
+  // Sort parameter names by ASCII / lexicographical order (smallest → largest)
   const sortedKeys = Object.keys(filtered).sort();
-  const pairs = sortedKeys.map((key) => `${key}=${filtered[key]}`);
-  return `${pairs.join('&')}&key=${secret}`;
+  const stringA = sortedKeys.map((key) => `${key}=${filtered[key]}`).join('&');
+  // Splice merchant key at the end
+  return `${stringA}&key=${secret}`;
 };
 
 /**
- * Generate SHA512 signature (UPPERCASE hex).
+ * Generate SHA512 signature (lowercase hex — confirmed against live HZPay API).
  * @param {Object} params
  * @param {string} secret
  * @param {Object} [options]
  * @returns {string}
  */
 const generateSignature = (params, secret, options = {}) => {
-  const payload = buildSignPayload(params, secret, options);
-  return crypto.createHash('sha512').update(payload, 'utf8').digest('hex').toUpperCase();
+  const stringSignTemp = buildSignPayload(params, secret, options);
+  return crypto.createHash('sha512').update(stringSignTemp, 'utf8').digest('hex').toLowerCase();
 };
 
 /**
- * Verify signature using timing-safe compare when lengths match.
+ * Verify signature using timing-safe compare (case-insensitive on incoming).
  * @param {Object} params - full body including sign
  * @param {string} secret
  * @param {Object} [options]
  * @returns {boolean}
  */
 const verifySignature = (params, secret, options = {}) => {
-  const incoming = String(params?.sign || '').toUpperCase();
+  const incoming = String(params?.sign || '').toLowerCase();
   if (!incoming) return false;
 
   const expected = generateSignature(params, secret, options);
@@ -101,7 +113,7 @@ const verifySignature = (params, secret, options = {}) => {
 };
 
 /**
- * Attach sign to a copy of params.
+ * Attach sign to a copy of params (values left as provided for the HTTP body).
  */
 const signParams = (params, secret, options = {}) => {
   const signed = { ...params };
@@ -112,6 +124,7 @@ const signParams = (params, secret, options = {}) => {
 module.exports = {
   isEmptyValue,
   formatAmountTwoDecimals,
+  formatAmountForGateway,
   buildSignPayload,
   generateSignature,
   verifySignature,

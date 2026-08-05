@@ -4,7 +4,7 @@
 
 const config = require('../config');
 const { hzpayClient } = require('../utils/axiosClient');
-const { signParams, formatAmountTwoDecimals } = require('../helpers/signature');
+const { signParams, formatAmountForGateway } = require('../helpers/signature');
 const { HZPAY_PATHS, GATEWAY_SUCCESS_CODE, BANK_CODES, DEFAULT_PAY_TYPE } = require('../constants');
 const { GatewayError, mapGatewayError } = require('../utils/errors');
 const logger = require('../utils/logger');
@@ -114,18 +114,18 @@ class HzpayApiService {
    * Success ONLY when code == 0
    */
   async createPayinOrder(input, meta = {}) {
-    const amount = formatAmountTwoDecimals(input.amount);
-    const body = this._signed(
-      {
-        mchOrderId: input.mchOrderId,
-        payType: Number(input.payType ?? config.hzpay.defaultPayType ?? DEFAULT_PAY_TYPE),
-        notifyUrl: input.notifyUrl || config.hzpay.notifyUrl,
-        returnUrl: input.returnUrl || config.hzpay.returnUrl,
-        amount,
-        goodsName: input.goodsName || 'Recharge',
-      },
-      { forceAmountDecimals: true }
-    );
+    // Amount string must match signed value exactly (docs example: amount=100, not 100.00)
+    const amount = formatAmountForGateway(input.amount);
+    const body = this._signed({
+      mchOrderId: input.mchOrderId,
+      payType: String(input.payType ?? config.hzpay.defaultPayType ?? DEFAULT_PAY_TYPE),
+      notifyUrl: input.notifyUrl || config.hzpay.notifyUrl,
+      ...(input.returnUrl || config.hzpay.returnUrl
+        ? { returnUrl: input.returnUrl || config.hzpay.returnUrl }
+        : {}),
+      amount,
+      goodsName: input.goodsName || 'Recharge',
+    });
 
     logger.info('HzpayApi', 'createPayinOrder', {
       mchOrderId: body.mchOrderId,
@@ -148,22 +148,19 @@ class HzpayApiService {
    * Success ONLY when code == 0
    */
   async createPayoutOrder(input, meta = {}) {
-    const amount = formatAmountTwoDecimals(input.amount);
+    const amount = formatAmountForGateway(input.amount);
     const bankCode = input.bankCode || (input.upi ? BANK_CODES.UPI : BANK_CODES.IMPS);
 
-    const body = this._signed(
-      {
-        mchOrderId: input.mchOrderId,
-        notifyUrl: input.notifyUrl || config.hzpay.payoutNotifyUrl,
-        amount,
-        bankCode,
-        accountNo: input.accountNo,
-        name: input.name,
-        ifsc: input.ifsc,
-        ...(input.upi ? { upi: input.upi } : {}),
-      },
-      { forceAmountDecimals: true }
-    );
+    const body = this._signed({
+      mchOrderId: input.mchOrderId,
+      notifyUrl: input.notifyUrl || config.hzpay.payoutNotifyUrl,
+      amount,
+      bankCode: String(bankCode),
+      accountNo: String(input.accountNo),
+      name: String(input.name),
+      ifsc: String(input.ifsc),
+      ...(input.upi ? { upi: String(input.upi) } : {}),
+    });
 
     logger.info('HzpayApi', 'createPayoutOrder', {
       mchOrderId: body.mchOrderId,
