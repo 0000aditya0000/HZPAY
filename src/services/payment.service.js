@@ -26,10 +26,10 @@ class PaymentService {
     return { code: 0, msg: 'success' };
   }
 
-  _resolvePayType(input) {
-    const payType = Number(input.payType ?? config.hzpay.defaultPayType ?? DEFAULT_PAY_TYPE);
+  _resolvePayType() {
+    const payType = Number(config.hzpay.defaultPayType ?? DEFAULT_PAY_TYPE);
     if (!ALL_PAY_TYPES.includes(payType)) {
-      throw new ValidationError('Invalid payment type', { payType });
+      throw new ValidationError('Invalid payment type configured', { payType });
     }
     return payType;
   }
@@ -59,7 +59,7 @@ class PaymentService {
 
     const mchOrderId = generatePayinOrderId();
     const orderAmount = Number(amount);
-    const payType = this._resolvePayType(input);
+    const payType = this._resolvePayType();
 
     logger.info('PaymentService', 'Calling HZPay createPayin', { mchOrderId, orderAmount, payType });
 
@@ -136,7 +136,7 @@ class PaymentService {
 
     const mchOrderId = input.mchOrderId || input.merchantOrderNo || generatePayinOrderId();
     const amount = Number(input.amount ?? input.orderAmount);
-    const payType = this._resolvePayType(input);
+    const payType = this._resolvePayType();
     const notifyUrl = input.notifyUrl || config.hzpay.notifyUrl;
 
     if (!notifyUrl) throw new ValidationError('Notify URL is required');

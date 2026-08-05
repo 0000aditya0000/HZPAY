@@ -118,7 +118,7 @@ class HzpayApiService {
     const amount = formatAmountForGateway(input.amount);
     const body = this._signed({
       mchOrderId: input.mchOrderId,
-      payType: String(input.payType ?? config.hzpay.defaultPayType ?? DEFAULT_PAY_TYPE),
+      payType: String(config.hzpay.defaultPayType ?? DEFAULT_PAY_TYPE),
       notifyUrl: input.notifyUrl || config.hzpay.notifyUrl,
       ...(input.returnUrl || config.hzpay.returnUrl
         ? { returnUrl: input.returnUrl || config.hzpay.returnUrl }

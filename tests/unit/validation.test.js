@@ -5,13 +5,23 @@ const {
 } = require('../../src/validators/hzpay.validator');
 
 describe('HZPay validation', () => {
-  test('createUserOrder accepts valid body and defaults payType', () => {
+  test('createUserOrder accepts valid body without payType', () => {
     const { error, value } = createUserOrderSchema.validate({
       amount: 100.5,
       userId: 12,
     });
     expect(error).toBeUndefined();
-    expect(value.payType).toBe(101);
+    expect(value.payType).toBeUndefined();
+  });
+
+  test('createUserOrder strips payType from client payload', () => {
+    const { error, value } = createUserOrderSchema.validate({
+      amount: 10,
+      userId: 1,
+      payType: 9999,
+    });
+    expect(error).toBeUndefined();
+    expect(value.payType).toBeUndefined();
   });
 
   test('createUserOrder rejects non-positive amount', () => {
@@ -19,17 +29,8 @@ describe('HZPay validation', () => {
     expect(error).toBeTruthy();
   });
 
-  test('createUserOrder rejects unsupported payType', () => {
-    const { error } = createUserOrderSchema.validate({
-      amount: 10,
-      userId: 1,
-      payType: 9999,
-    });
-    expect(error).toBeTruthy();
-  });
-
   test('payinCreate requires amount', () => {
-    const { error } = payinCreateSchema.validate({ payType: 101 });
+    const { error } = payinCreateSchema.validate({ goodsName: 'x' });
     expect(error).toBeTruthy();
   });
 

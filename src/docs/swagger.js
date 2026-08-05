@@ -43,7 +43,6 @@ const swaggerSpec = {
                   amount: { type: 'number', example: 100.0 },
                   userId: { type: 'integer', example: 12 },
                   user_mobile: { type: 'string', example: '9876543210' },
-                  payType: { type: 'integer', example: 101 },
                 },
               },
             },

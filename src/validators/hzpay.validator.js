@@ -1,5 +1,5 @@
 const Joi = require('joi');
-const { ALL_PAY_TYPES, BANK_CODES, DEFAULT_PAY_TYPE } = require('../constants');
+const { BANK_CODES } = require('../constants');
 
 const amountSchema = Joi.number().positive().precision(2).required();
 
@@ -9,29 +9,22 @@ const createUserOrderSchema = Joi.object({
   user_mobile: Joi.string().allow('', null).optional(),
   recharge_type: Joi.string().optional(),
   payment_mode: Joi.string().optional(),
-  payType: Joi.number()
-    .integer()
-    .valid(...ALL_PAY_TYPES)
-    .default(DEFAULT_PAY_TYPE)
-    .optional(),
   goodsName: Joi.string().max(120).optional(),
-});
+}).prefs({ stripUnknown: true });
 
 const payinCreateSchema = Joi.object({
   mchOrderId: Joi.string().max(64).optional(),
   merchantOrderNo: Joi.string().max(64).optional(),
   amount: amountSchema.optional(),
   orderAmount: amountSchema.optional(),
-  payType: Joi.number()
-    .integer()
-    .valid(...ALL_PAY_TYPES)
-    .optional(),
   notifyUrl: Joi.string().uri().optional(),
   returnUrl: Joi.string().uri().allow('', null).optional(),
   goodsName: Joi.string().max(120).optional(),
   extra: Joi.string().max(500).allow('', null).optional(),
   userId: Joi.alternatives().try(Joi.number().integer(), Joi.string()).optional(),
-}).or('amount', 'orderAmount');
+})
+  .or('amount', 'orderAmount')
+  .prefs({ stripUnknown: true });
 
 const payoutCreateSchema = Joi.object({
   withdrawId: Joi.alternatives().try(Joi.number().integer(), Joi.string()).optional(),
@@ -59,7 +52,8 @@ const payoutCreateSchema = Joi.object({
   .or('withdrawId', 'withdrawalId')
   .or('amount', 'orderAmount')
   .or('bankNo', 'cardNumber', 'accountNo')
-  .or('name', 'accountName');
+  .or('name', 'accountName')
+  .prefs({ stripUnknown: true });
 
 module.exports = {
   createUserOrderSchema,

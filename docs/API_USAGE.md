@@ -8,12 +8,11 @@
 {
   "amount": 100.00,
   "userId": 12,
-  "user_mobile": "9876543210",
-  "payType": 101
+  "user_mobile": "9876543210"
 }
 ```
 
-`payType` defaults to **101** when omitted.
+`payType` is set on the backend only (default **101** via `HZPAY_DEFAULT_PAY_TYPE`).
 
 Response:
 
@@ -48,4 +47,5 @@ Supported `bankCode`: `IMPS`, `UPI`. If `upi` is provided and `bankCode` omitted
 
 `POST /api/payments/create`
 
-Accepts `amount` / `orderAmount`, optional `mchOrderId`, `payType`, `notifyUrl`, `returnUrl`, `goodsName`.
+Accepts `amount` / `orderAmount`, optional `mchOrderId`, `notifyUrl`, `returnUrl`, `goodsName`.
+`payType` is always applied from backend config.
