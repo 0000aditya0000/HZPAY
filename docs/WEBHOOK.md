@@ -14,18 +14,16 @@ NOTIFY_URL=https://hzpay.rollix777.com/api/payment/webhook
 PAYOUT_NOTIFY_URL=https://hzpay.rollix777.com/api/payout/webhook
 ```
 
-## Default payload (placeholder — replace when official docs arrive)
-
-### Payin
+## Payin payload (live)
 
 ```json
 {
+  "amount": "100.00",
   "mchNo": "1701282757001",
-  "mchOrderId": "HZ_...",
-  "orderNo": "...",
-  "amount": 100.00,
+  "mchOrderId": "HZ_20260806_031531_004",
+  "orderDate": "2026-08-06 05:45:32",
+  "orderNo": "S2085120040381980672",
   "payStatus": "1",
-  "orderDate": "2026-08-06 12:00:00",
   "sign": "..."
 }
 ```
@@ -33,11 +31,8 @@ PAYOUT_NOTIFY_URL=https://hzpay.rollix777.com/api/payout/webhook
 | Field | Notes |
 |-------|-------|
 | `payStatus` | **1** success · **2** failed · **0** pending |
-| `amount` | Signed with **2 decimal places** (`100.00`) |
-
-### Payout
-
-Same shape; status field is `status` (`1` / `2`).
+| `amount` | String with 2 decimals (`100.00`) — signed as received |
+| `mchOrderId` | Our merchant order id |
 
 ## Response (critical)
 

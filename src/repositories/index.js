@@ -1,8 +1,6 @@
-const { Op } = require('sequelize');
 const {
   sequelize,
   User,
-  Recharge,
   Withdrawl,
   PaymentOrder,
   PayoutOrder,
@@ -53,7 +51,15 @@ class RechargeRepository {
   }
 
   async findByOrderId(orderId) {
-    return Recharge.findOne({ where: { order_id: orderId } });
+    // Raw SELECT — production `recharge` has no `id` (and may lack optional columns)
+    const [rows] = await sequelize.query(
+      `SELECT order_id, recharge_id, userId, recharge_amount, recharge_status, isDepAdded
+       FROM recharge
+       WHERE order_id = ?
+       LIMIT 1`,
+      { replacements: [orderId] }
+    );
+    return rows?.[0] || null;
   }
 
   /**
@@ -61,18 +67,23 @@ class RechargeRepository {
    * UPDATE ... SET success, isDepAdded=1 WHERE order_id=? AND isDepAdded=0
    */
   async markSuccessIfPending(orderId) {
-    const [affected] = await Recharge.update(
-      { recharge_status: 'success', isDepAdded: 1 },
-      { where: { order_id: orderId, isDepAdded: 0 } }
+    const [result] = await sequelize.query(
+      `UPDATE recharge
+       SET recharge_status = 'success', isDepAdded = 1
+       WHERE order_id = ? AND isDepAdded = 0`,
+      { replacements: [orderId] }
     );
-    return affected;
+    return result?.affectedRows ?? 0;
   }
 
   async markFailed(orderId) {
-    return Recharge.update(
-      { recharge_status: 'failed' },
-      { where: { order_id: orderId, recharge_status: { [Op.ne]: 'success' } } }
+    const [result] = await sequelize.query(
+      `UPDATE recharge
+       SET recharge_status = 'failed'
+       WHERE order_id = ? AND recharge_status <> 'success'`,
+      { replacements: [orderId] }
     );
+    return result?.affectedRows ?? 0;
   }
 }
 

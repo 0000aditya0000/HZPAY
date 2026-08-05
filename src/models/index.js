@@ -19,9 +19,9 @@ const User = sequelize.define(
 const Recharge = sequelize.define(
   'Recharge',
   {
-    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    // Production `recharge` table has no `id` column — use order_id as PK for Sequelize
+    order_id: { type: DataTypes.STRING(100), primaryKey: true, allowNull: false },
     recharge_id: { type: DataTypes.STRING(100), allowNull: false },
-    order_id: { type: DataTypes.STRING(100), allowNull: false },
     userId: { type: DataTypes.INTEGER, allowNull: true },
     user_mobile: { type: DataTypes.STRING(30), allowNull: true },
     recharge_amount: { type: DataTypes.DECIMAL(18, 2), allowNull: false },
@@ -29,8 +29,6 @@ const Recharge = sequelize.define(
     payment_mode: { type: DataTypes.STRING(50), allowNull: true },
     date: { type: DataTypes.STRING(20), allowNull: true },
     time: { type: DataTypes.STRING(20), allowNull: true },
-    silkpay_timestamp: { type: DataTypes.BIGINT, allowNull: true },
-    gateway_transaction_id: { type: DataTypes.STRING(100), allowNull: true },
     recharge_status: { type: DataTypes.STRING(30), allowNull: true },
     isDepAdded: { type: DataTypes.INTEGER, allowNull: true, defaultValue: 0 },
   },
