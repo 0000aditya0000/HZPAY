@@ -14,6 +14,7 @@ const { ORDER_STATUS, PAY_STATUS, WITHDRAW_STATUS, BANK_CODES } = require('../co
 const { verifySignature } = require('../helpers/signature');
 const { ValidationError, GatewayError, SignatureError } = require('../utils/errors');
 const logger = require('../utils/logger');
+const { platformService } = require('./platform.service');
 
 class PayoutService {
   /**
@@ -197,14 +198,58 @@ class PayoutService {
     }
 
     if (status === PAY_STATUS.FAILED) {
-      await withdrawlRepository.updateStatusByMorderId(mchOrderId, WITHDRAW_STATUS.FAILED);
+      const withdrawl = await withdrawlRepository.findForRefundByMorderId(mchOrderId);
+
+      if (!withdrawl) {
+        logger.warn('PayoutWebhook', 'FAILED but withdrawl not found', { mchOrderId });
+        return { processed: false, reason: 'withdrawl_not_found' };
+      }
+
+      if (Number(withdrawl.status) === WITHDRAW_STATUS.FAILED) {
+        logger.info('PayoutWebhook', 'Already failed — skip refund', {
+          mchOrderId,
+          withdrawId: withdrawl.id,
+        });
+        return { processed: true, status: 'failed', refunded: false, reason: 'already_failed' };
+      }
+
+      try {
+        await platformService.refundFailedPayout({
+          userId: withdrawl.userId,
+          amount: withdrawl.balance,
+          cryptoname: withdrawl.cryptoname || 'INR',
+          withdrawId: withdrawl.id,
+          morderId: mchOrderId,
+        });
+        logger.info('PayoutWebhook', 'Wallet refunded after FAILED payout', {
+          mchOrderId,
+          withdrawId: withdrawl.id,
+          userId: withdrawl.userId,
+          amount: withdrawl.balance,
+        });
+      } catch (refundErr) {
+        logger.logError(
+          'PayoutWebhook',
+          `CRITICAL: Payout FAILED but wallet refund FAILED | mchOrderId=${mchOrderId} | withdrawId=${withdrawl.id} | userId=${withdrawl.userId} | amount=${withdrawl.balance}`,
+          refundErr
+        );
+        return { processed: false, status: 'failed', refunded: false, error: refundErr.message };
+      }
+
+      await withdrawlRepository.markFailedIfNotAlreadyFailed(mchOrderId);
       await payoutOrderRepository
         .updateByMerchantOrderNo(mchOrderId, {
           status: ORDER_STATUS.FAILED,
         })
         .catch(() => {});
-      logger.warn('PayoutWebhook', 'Payout FAILED', { mchOrderId, msg: payload.msg || payload.message });
-      return { processed: true, status: 'failed' };
+      logger.warn('PayoutWebhook', 'Payout FAILED — status updated + refunded', {
+        mchOrderId,
+        msg: payload.msg || payload.message,
+        withdrawId: withdrawl.id,
+        userId: withdrawl.userId,
+        amount: withdrawl.balance,
+      });
+      return { processed: true, status: 'failed', refunded: true };
     }
 
     return { processed: false, reason: 'unknown_status', status };
